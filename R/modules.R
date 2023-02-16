@@ -3,6 +3,10 @@ library(dplyr)
 library(plotly)
 library(scales)
 library(glue)
+library(shinyWidgets)
+library(strex)
+library(tidyr)
+library(purrr)
 
 ######## 1st TAB FUNCTION AND MODULE
 
@@ -161,6 +165,12 @@ graderadarInput <- function(id) {
 
 graderadarServer <- function(id, assay_size){
   moduleServer(id, function(input,output,session){
+    ppm_elements <- c("Au", "Ce", "Gd", "Hf", "La", "Nd", "Rb", "Th", "Y", "Zr")
+    percentage_elements <- c("Al", "Ca", "Fe", "Mg", "Si")
+    choiceValues_ppm <- c("Au_ppm_grade", "Ce_ppm_grade", "Gd_ppm_grade", "Hf_ppm_grade", 
+                          "La_ppm_grade", "Nd_ppm_grade", "Rb_ppm_grade", "Th_ppm_grade", "Y_ppm_grade", "Zr_ppm_grade")
+    choiceValues_percentage <- c("Al_percentage_grade", "Ca_percentage_grade", "Fe_percentage_grade",
+                                 "Mg_percentage_grade", "Si_percentage_grade")
     
     output$select_size_type <- renderUI(
       radioButtons(session$ns("select_size"), "Select Size Type", 
@@ -311,4 +321,108 @@ graderadarServer <- function(id, assay_size){
     )
   })
 }
+
+## 3rd TAB MODULE
+
+recoveryInput <- function(id) {
+  ns <- NS(id)
+  
+  tagList(
+    checkboxGroupInput(
+      inputId = ns("sample"), 
+      label = "Select Sample", 
+      choices = c("Sample 2", "Sample 3"), 
+      selected = c("Sample 2", "Sample 3"),
+      inline = T
+    ),
+    selectInput(ns("screen_size"), "Select Screen Size", choices = unique(assay_size$Screen)),
+    uiOutput(ns("select_size_type")),
+    uiOutput(ns("select_recovery_elements"))
+  )
+}
+
+recoveryServer <- function(id, assay_size){
+  moduleServer(id, function(input,output,session){
+    recovery_elements <- c("Al", "Au", "Ca", "Ce", "Fe", "Gd", 
+                           "Hf", "La", "Mg", "Nd", "Rb", "Si", "Th", "Y", "Zr")
+    
+    recoveryValues <- c("Al_percentage_recovery", "Au_percentage_recovery", "Ca_percentage_recovery", 
+                        "Ce_percentage_recovery", "Fe_percentage_recovery", "Gd_percentage_recovery", 
+                        "Hf_percentage_recovery", "La_percentage_recovery", "Mg_percentage_recovery", 
+                        "Nd_percentage_recovery", "Rb_percentage_recovery", "Si_percentage_recovery", 
+                        "Th_percentage_recovery", "Y_percentage_recovery", "Zr_percentage_recovery"
+    )
+    
+    output$select_size_type <- renderUI(
+      radioButtons(session$ns("select_size"), "Select Size Type", 
+                   choices = unique(assay_size$Type[assay_size$Screen == input$screen_size]))
+    )
+    
+    all_recovery <- reactive(assay_size %>% 
+                               filter(Sample %in% input$sample, Screen == input$screen_size, Type %in% input$select_size) %>%
+                               select(c(1:3), matches("_recovery")))
+    
+    range_choices_recovery <- reactive({
+      req(input$select_size)
+      temp_percent <- all_recovery()[, -c(1:3)]
+      range_percent <- sapply(temp_percent, range)
+      percent_list <- c()
+      for(i in 1:length(recovery_elements)){
+        temp_list <- glue("{range_percent[1,i]}-{range_percent[2,i]}")
+        percent_list <- c(percent_list, temp_list)
+      }
+      percent_list
+    })
+    
+    output$select_recovery_elements <- renderUI(
+      pickerInput(
+        inputId = session$ns("select_elements"),
+        label = "Select Elements ",
+        choices = setNames(recoveryValues, recovery_elements),
+        multiple = T,
+        selected = recoveryValues,
+        options = list(
+          `selected-text-format` = "count > 3",
+          `actions-box` = TRUE),
+        choicesOpt = list(
+          subtext = paste("range:", range_choices_recovery())
+        )
+      )
+    )
+    
+    last_data_percent <-  reactive({
+      req(input$select_elements)
+      temp <- all_recovery() %>% select(c(1:3) ,all_of(input$select_elements))
+      colnames(temp)[4:ncol(temp)] <- names(temp[4:ncol(temp)]) %>% str_before_first("_")
+      pivot_longer(temp, 4:length(temp)) %>% 
+        mutate(color = case_when(Sample == "Sample 2" ~ "#F8766D",
+                                 Sample == "Sample 3" ~ "#00BFC4"))
+    })
+    
+    plot <- reactive(plot_ly(last_data_percent(),
+                             x = ~name,
+                             y = ~value,
+                             type = "bar",
+                             text = glue("{last_data_percent()$value}%"),
+                             textangle = 0,
+                             textfont = list(color = "#FFF"),
+                             hovertemplate = paste("<b>%{x} Recovery:</b> %{y}"),
+                             split = ~Sample,
+                             marker = list(color = last_data_percent()$color,
+                                           line = list(color = 'rgb(8,48,107)', 
+                                                       width = 1.5))) %>% 
+                       layout(title = "Element Recovery (%)",
+                              barmode = 'group',
+                              xaxis = list(title = ""),
+                              yaxis = list(title = "",
+                                           ticksuffix="%",
+                                           range = list(0,100)),
+                              font=list(size=11),
+                              hoverlabel = list(font = list(color = "white"))
+                       )
+    )
+  }
+  )
+}
+
 
