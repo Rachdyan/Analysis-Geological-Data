@@ -18,7 +18,14 @@ minor_breaks <- rep(1:9, 21)*(10^rep(-10:10, each=9))
 ### SECOND & THIRD TAB 
 assay_size <- read.csv("./data/assay-by-size.csv", sep = ";")
 
+## FOURTH TAB
+xrf_data <- read.csv("./data/xrf.csv", sep =";")
 
+## FIFTH TAB
+xrd_sum_data <- read.csv("./data/xrd_summary.csv") %>% .[,-4]
+
+## 6th TAB
+stacked_qxrd_data <- read.csv("./data/stacked_qxrd.csv")
 
 ### APP
 
@@ -50,14 +57,49 @@ ui <- navbarPage("Geology Data Analysis",
                  tabPanel("Recovery",
                           fluidPage(sidebarLayout(position = "left",
                                                   sidebarPanel(
-                                                    graderadarInput("recovery")
+                                                    recoveryInput("recovery")
                                                   ),
                                                   mainPanel(
                                                       plotlyOutput(outputId = "recovery_plot")
                                                   )
                                                   )
                           )
+                          ),
+                 tabPanel("XRF",
+                          fluidPage(sidebarLayout(position = "left",
+                                                  sidebarPanel(
+                                                    xrfInput("xrf")
+                                                  ),
+                                                  mainPanel(
+                                                    plotlyOutput(outputId = "xrf_plot")
+                                                  )
                           )
+                          )
+                          ),
+                 tabPanel("XRD Summary",
+                          fluidPage(sidebarLayout(position = "left",
+                                                  sidebarPanel(
+                                                    xrdsumInput("xrd_sum")
+                                                  ),
+                                                  mainPanel(
+                                                    plotlyOutput(outputId = "xrd_sum_graph")
+                                                  )
+                          )
+                          )
+                 ),
+                 tabPanel("Stacked QXRD",
+                          fluidPage(sidebarLayout(position = "left",
+                                                  sidebarPanel(
+                                                    stackedqxrdInput("stacked_qxrd"),
+                                                    width = 2
+                                                  ),
+                                                  mainPanel(
+                                                    plotlyOutput(outputId = "stacked_qxrd_graph"),
+                                                    width = 10
+                                                  )
+                          )
+                          )
+                 )
 )
 
 
@@ -78,6 +120,21 @@ server <- function(input, output, session) {
   recovery_data <- recoveryServer("recovery", assay_size)
   output$recovery_plot <- renderPlotly(
     recovery_data()
+  )
+  
+  xrf_graph <- xrfServer("xrf", xrf_data)
+  output$xrf_plot <- renderPlotly(
+    xrf_graph()
+  )
+  
+  xrd_sum_plot <- xrdsumServer("xrd_sum", xrd_sum_data)
+  output$xrd_sum_graph <- renderPlotly(
+    xrd_sum_plot()
+  )
+  
+  stacked_xrd_plot <- stackedqxrdServer("stacked_qxrd", stacked_qxrd_data)
+  output$stacked_qxrd_graph <- renderPlotly(
+    stacked_xrd_plot()
   )
 }
 

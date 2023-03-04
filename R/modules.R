@@ -425,4 +425,181 @@ recoveryServer <- function(id, assay_size){
   )
 }
 
+## 4th TAB
 
+xrfInput <- function(id) {
+  ns <- NS(id)
+  
+  tagList(
+    checkboxGroupInput(
+      inputId = ns("sample"), 
+      label = "Select Sample", 
+      choices = c("Sample 2", "Sample 3"), 
+      selected = c("Sample 2", "Sample 3"),
+      inline = T
+    ),
+    selectInput(ns("screen"), "Select Screen", choices = c("+6.7mm", "6.7x4.75mm", "4.5x3.35mm", "3.35x2.36mm", "2.36x1.7mm", 
+                                                           "1.7x1.18mm", "1.18mmx850um", "850x600um", "600x425um", "425x300um", 
+                                                           "300x212um", "212x106um", "106x75um", "75x53um", "53x38um", "-38um"
+    )),
+    uiOutput(ns("xrf_elements"))
+  )
+}
+
+xrfServer <- function(id, xrf_data){
+  moduleServer(id, function(input,output,session){
+    xrf_elements_list <- c("Al2O3", "BaO", "CaO", "Cr2O3", "Fe2O3", "K2O", "MgO", "MnO", 
+                           "Na2O", "P2O5", "SO3", "SiO2", "SrO", "TiO2")
+    
+    all_xrf <- reactive(xrf_data %>%
+                          filter(Sample %in% input$sample, Screen == input$screen)
+    )
+    
+    range_choices_xrf <- reactive({
+      req(input$screen)
+      temp_percent <- all_xrf()[, -c(1:3)]
+      range_percent <- sapply(temp_percent, range)
+      percent_list <- c()
+      for(i in 1:length(xrf_elements_list)){
+        temp_list <- glue("{range_percent[1,i]}-{range_percent[2,i]}")
+        percent_list <- c(percent_list, temp_list)
+      }
+      percent_list
+    })
+    
+    
+    selected_elements <- c("Al2O3", "CaO", "MgO", "Na2O", "K2O", "Fe2O3")
+    
+    output$xrf_elements <- renderUI(
+      pickerInput(
+        inputId = session$ns("select_element"),
+        label = "Select Elements ",
+        choices = xrf_elements_list,
+        multiple = T,
+        selected = selected_elements,
+        options = list(
+          `selected-text-format` = "count > 3",
+          `actions-box` = TRUE),
+        choicesOpt = list(
+          subtext = paste("range:", range_choices_xrf())
+        )
+      )
+    )
+    
+    last_data_xrf <-  reactive({
+      req(input$select_element)
+      temp <- all_xrf() %>% select(c(1:3) ,all_of(input$select_element))
+      pivot_longer(temp, 4:length(temp)) %>% 
+        mutate(color = case_when(Sample == "Sample 2" ~ "#F8766D",
+                                 Sample == "Sample 3" ~ "#00BFC4"))
+    }
+    )
+    
+    plot <- reactive(plot_ly(last_data_xrf(), x = ~value, y = ~name, split  = ~Sample, type = 'scatter',
+                             mode = "markers", marker = list(color = last_data_xrf()$color), 
+                             hovertemplate = paste("<b>%{y}:</b> %{x}")) %>% 
+                       layout(yaxis = list(title = "", categoryorder = "total ascending"),
+                              xaxis = list(title = "Percentage", ticksuffix="%"))
+                     
+    )
+  }
+  )
+}
+
+
+## 5th Tab Module
+
+xrdsumInput <- function(id) {
+  ns <- NS(id)
+  
+  tagList(
+    checkboxGroupInput(
+      inputId = ns("sample"), 
+      label = "Select Sample", 
+      choices = c("Con 1", "Con 2"), 
+      selected = c("Con 1", "Con 2"),
+      inline = T
+    ),
+    pickerInput(
+      inputId = ns("select_mineral"),
+      label = "Select Mineral Phases ",
+      choices = c("Quartz", "Ilmenite", "Almandine", "Monazite", "Rutile", "Anastase", 
+                  "Perovskite", "Zircon", "Hematite"),
+      multiple = T,
+      selected = c("Quartz", "Ilmenite", "Almandine", "Monazite", "Rutile", "Anastase", 
+                   "Perovskite", "Zircon", "Hematite"),
+      options = list(
+        `selected-text-format` = "count > 3",
+        `actions-box` = TRUE))
+    
+  )
+}
+
+xrdsumServer <- function(id, xrd_sum_data){
+  moduleServer(id, function(input,output,session){
+    
+    all_xrd_sum <- reactive(xrd_sum_data %>%
+                              filter(Sample %in% input$sample, Mineral %in% input$select_mineral))
+    
+    last_xrd_sum <- reactive({
+      req(input$select_mineral)
+      current_data <- all_xrd_sum()
+      factor_level <- current_data$Mineral[order(current_data$percentage_wt, decreasing = T)] %>% unique()
+      current_data$Mineral <- factor(current_data$Mineral,levels = factor_level)
+      current_data
+    })
+    
+    plot <- reactive(
+      plot_ly(last_xrd_sum(), x = ~Sample, y = ~percentage_wt, type = 'bar',
+              color = ~Mineral, colors = "Accent",
+              hovertemplate = paste("<b>%{x}:</b> %{y}%")) %>%
+        layout(yaxis = list(title = "Percentage (wt. %)"),
+               barmode = 'stack') 
+    )
+    
+  }
+  )
+}
+
+### 6th Tab Modules
+
+stackedqxrdInput <- function(id) {
+  ns <- NS(id)
+  
+  tagList(
+    checkboxGroupInput(
+      inputId = ns("sample"), 
+      label = "Select Sample", 
+      choices = c("Con 1", "Con 2"), 
+      selected = c("Con 1", "Con 2"),
+      inline = T
+    ),
+    radioButtons(ns('intensity'), "Select the Intensity Type", 
+                 c("Offsetted Intensity" = "Offsetted.Intensity", 
+                   "Raw Intensity" = "Raw.Intensity"))
+  )
+}
+
+stackedqxrdServer <- function(id, stacked_qxrd_data){
+  moduleServer(id, function(input,output,session){
+    
+    last_data <- reactive({
+      req(input$sample)
+      data <- stacked_qxrd_data %>% filter(Sample %in% input$sample) %>%
+        mutate(color = case_when(Sample == "Con 1" ~ "#F8766D",
+                                 Sample == "Con 2" ~ "#00BFC4"))
+    })
+    
+    plot <- reactive(
+      plot_ly(last_data(), x = ~X2Theta, y = ~get(input$intensity), 
+              split = ~Sample, type = "scatter", mode = "lines", 
+              line = list(color = last_data()$color)) %>%
+        layout(yaxis = list(title = "Intensity"),
+               xaxis = list(title = "2 Theta"),
+               legend = list(x = 0.03, y = 0.98, title = list(text='<b> Sample </b>'))
+        )
+    )
+    
+  }
+  )
+}

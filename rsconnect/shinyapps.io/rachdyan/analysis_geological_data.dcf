@@ -5,10 +5,10 @@ account: rachdyan
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 8309850
-bundleId: 6845641
+bundleId: 6915704
 url: https://rachdyan.shinyapps.io/analysis_geological_data/
-when: 1676388746.41981
-lastSyncTime: 1676388746.41982
+when: 1677944892.13833
+lastSyncTime: 1677944892.13837
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: Static R Code/app_static.R|Static R Code/polar_static.R|Static R Code/screen size report.R
+ignoredFiles: Static R Code
