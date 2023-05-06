@@ -7,6 +7,7 @@ library(shinyWidgets)
 library(strex)
 library(tidyr)
 library(purrr)
+library(bslib)
 
 source("./R/modules.R")
 
@@ -29,7 +30,10 @@ stacked_qxrd_data <- read.csv("./data/stacked_qxrd.csv")
 
 ### APP
 
+## bs_theme(version = 4, bootswatch = "sandstone")
+
 ui <- navbarPage("Geology Data Analysis",
+                 theme = bs_theme(version = 3, bootswatch = "sandstone"),
                  tabPanel("Screen Sizing",
                           fluidPage(sidebarLayout(position = "left",
                             sidebarPanel(
